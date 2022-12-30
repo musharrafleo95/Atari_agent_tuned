@@ -48,69 +48,6 @@ DEFAULT_HYPERPARAMS = {
     "seed": 0
 }
 
-def objective(trial: optuna.Trial) -> float:
-    """
-    Objective function using by Optuna to evaluate
-    one configuration (i.e., one set of hyperparameters).
-
-    Given a trial object, it will sample hyperparameters,
-    evaluate it and report the result (mean episodic reward after training)
-
-    :param trial: Optuna trial object
-    :return: Mean episodic reward after training
-    """
-
-    kwargs = DEFAULT_HYPERPARAMS.copy()
-
-    # 1. Sample hyperparameters and update the keyword arguments
-    kwargs.update(sample_dqn_params(trial))
-    kwargs.update({"env": wrapped_env})
-    # Create the RL model
-    model = DQN(**kwargs)
-
-    # 2. Create envs used for evaluation using `make_vec_env`, `ENV_ID` and `N_EVAL_ENVS`
-    eval_envs = make_vec_env(ENV_NAME,
-                         n_envs=NUM_EVAL_ENV,
-                         wrapper_class=ConcateObs,
-                         wrapper_kwargs=dict(
-                             k=NUM_FRAMES,
-                             normalize_frame=False
-                         )
-                        )
-    # 3. Create the `TrialEvalCallback` callback defined above that will periodically evaluate
-    # and report the performance using `N_EVAL_EPISODES` every `EVAL_FREQ`
-    # TrialEvalCallback signature:
-    # TrialEvalCallback(eval_env, trial, n_eval_episodes, eval_freq, deterministic, verbose)
-    eval_callback = TrialEvalCallback(eval_envs,
-                                      trial,
-                                      NUM_EVAL_EPISODES,
-                                      EVAL_FREQ,
-                                      deterministic=True)
-
-    ### END OF YOUR CODE
-
-    nan_encountered = False
-    try:
-        # Train the model
-        model.learn(BUDGET, callback=eval_callback)
-    except AssertionError as e:
-        # Sometimes, random hyperparams can generate NaN
-        print(e)
-        nan_encountered = True
-    finally:
-        # Free memory
-        model.env.close()
-        eval_envs.close()
-
-    # Tell the optimizer that the trial failed
-    if nan_encountered:
-        return float("nan")
-
-    if eval_callback.is_pruned:
-        raise optuna.exceptions.TrialPruned()
-
-    return eval_callback.last_mean_reward
-
 if __name__ == '__main__':
     env = gym.make(ENV_NAME)
     wrapped_env = ConcateObs(env, NUM_FRAMES, normalize_frame=False)
