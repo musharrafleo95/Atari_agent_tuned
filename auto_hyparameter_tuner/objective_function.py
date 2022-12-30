@@ -43,7 +43,7 @@ class Objective_function:
         self.seed = seed
         self.eval_deterministic = eval_deterministic
 
-    def objective(self, trial: optuna.Trial):
+    def __call__(self, trial: optuna.Trial):
 
         """
         Objective function using by Optuna to evaluate
@@ -55,12 +55,12 @@ class Objective_function:
         :param trial: Optuna trial object
         :return: Mean episodic reward after training
         """
+        self.rl_env.reset()
 
         kwargs = self.default_hyperparams.copy()
-
         # 1. Sample hyperparameters and update the keyword arguments
         kwargs.update(self.sampler(trial))
-        kwargs.update({"env": self.rl_env.reset(seed=self.seed)})
+        kwargs.update({"env": self.rl_env})
         # Create the RL model
         model = self.model(**kwargs)
 
